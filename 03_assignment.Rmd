@@ -1,0 +1,238 @@
+---
+title: 'Assignment #3'
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    df_print: paged
+    code_download: true
+---
+
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+```{r libraries, message=FALSE}
+# SEE modeldata package for new datasets
+library(tidyverse)         # for graphing and data cleaning
+library(tidymodels)        # for modeling
+library(stacks)            # for stacking models
+library(naniar)            # for examining missing values (NAs)
+library(lubridate)         # for date manipulation
+library(moderndive)        # for King County housing data
+library(DALEX)             # for model interpretation  
+library(DALEXtra)          # for extension of DALEX
+library(patchwork)         # for combining plots nicely
+library(dbplyr)            # for SQL query "cheating" - part of tidyverse but needs to be loaded separately
+library(mdsr)              # for accessing some databases - goes with Modern Data Science with R textbook
+library(RMySQL)            # for accessing MySQL databases
+library(RSQLite)           # for accessing SQLite databases
+
+#mapping
+library(maps)              # for built-in maps
+library(sf)                # for making maps using geom_sf
+library(ggthemes)          # Lisa added - I like theme_map() for maps :)
+
+#tidytext
+library(tidytext)          # for text analysis, the tidy way!
+library(textdata)          
+library(reshape2)
+library(wordcloud)         # for wordcloud
+library(stopwords)
+
+theme_set(theme_minimal()) # Lisa's favorite theme
+```
+
+When you finish the assignment, remove the `#` from the options chunk at the top, so that messages and warnings aren't printed. If you are getting errors in your code, add `error = TRUE` so that the file knits. I would recommend not removing the `#` until you are completely finished.
+
+## Put it on GitHub!        
+
+From now on, GitHub should be part of your routine when doing assignments. I recommend making it part of your process anytime you are working in R, but I'll make you show it's part of your process for assignments.
+
+**Task**: When you are finished with the assignment, post a link below to the GitHub repo for the assignment. If you want to post it to your personal website, that's ok (not required). Make sure the link goes to a spot in the repo where I can easily find this assignment. For example, if you have a website with a blog and post the assignment as a blog post, link to the post's folder in the repo. As an example, I've linked to my GitHub stacking material [here](https://github.com/llendway/ads_website/tree/master/_posts/2021-03-22-stacking).
+
+
+## Local Interpretable Machine Learning
+
+You are going to use the King County house data and the same random forest model to predict `log_price` that I used in the [tutorial](https://advanced-ds-in-r.netlify.app/posts/2021-03-31-imllocal/).
+
+**Tasks:**
+
+1. Choose 3 new observations and do the following for each observation:  
+  - Construct a break-down plot using the default ordering. Interpret the resulting graph. Which variables contribute most to each observation's prediction?  
+  - Construct a SHAP graph and interpret it. Does it tell a similar story to the break-down plot?  
+  - Construct a LIME graph (follow my code carefully). How close is each original prediction to the prediction from the local model? Interpret the result. You can also try using fewer or more variables in the local model than I used in the example.  
+  
+2. Describe how you would use the interpretable machine learning tools we've learned (both local and global) in future machine learning projects? How does each of them help you?
+
+## SQL
+
+You will use the `airlines` data from the SQL database that I used in the example in the [tutorial](https://advanced-ds-in-r.netlify.app/posts/2021-03-29-sqlinr/). Be sure to include the chunk to connect to the database here. And, when you are finished, disconnect. You may need to reconnect throughout as it times out after a while.
+
+**Tasks**:
+
+1. Create a SQL chunk and an equivalent R code chunk that does the following: for each airport (with its name, not code), year, and month find the total number of departing flights, the distinct destinations to which they flew, the average length of the flight, the average distance of the flight, and the proportion of flights that arrived more than 20 minutes late. In the R code chunk, write this out to a dataset. (HINT: 1. start small! 2. you may want to do the R part first and use it to "cheat" into the SQL code).  
+  - With the dataset you wrote out, create a graph that helps illustrate the "worst" airports in terms of late arrivals. You have some freedom in how you define worst and you may want to consider some of the other variables you computed. Do some theming to make your graph look glamorous (those of you who weren't in my intro data science class this year may want to watch Will Chase's [Glamour of Graphics](https://www.youtube.com/watch?v=h5cTacaWE6I) talk for inspiration).  
+  - Although your graph was truly inspirational, you've been requested to "boil it down to a few numbers." Some people just don't appreciate all that effort you put in. And, you need to use the already summarized data that you already pulled in from SQL. Create a table with 6 or fewer rows and 3 or fewer columns that summarizes which airport is the "worst" in terms of late arrivals. Be careful with your calculations. You may consider using the `kable`, `kableExtra`, or `gt` packages to make your table look truly spectacular.
+  
+2. Come up with your own interesting question that data in the airlines database can help you answer. Write a SQL query and equivalent R code chunk to extract the data you need and create an elegant graph to help answer the question. Be sure to write down the question so it is clear. 
+
+
+## Function Friday
+
+If you need to revisit the material, it is posted on the moodle page. I've tried to add all the necessary libraries to the top, but I may have missed something.
+
+**`geom_sf()` tasks**:
+
+Using the example from class that we presented as a baseline (or your own if you really want to be ambitious), try to add the following components to the map of the contiguous United States:
+
+1.	Change the color scheme of the map from the default blue (one option could be viridis).
+2.	Add a dot (or any symbol you want) to the centroid of each state.
+3.	Add a layer onto the map with the counties.
+4.	Change the coordinates of the map to zoom in on your favorite state.
+
+Hint: https://www.r-spatial.org/r/2018/10/25/ggplot2-sf-2.html is a useful reference for some of the questions
+
+**`tidytext` tasks**:
+
+Now you will try using tidytext on a new dataset about Russian Troll tweets.
+
+#### Read about the data
+
+These are tweets from Twitter handles that are connected to the Internet Research Agency (IRA), a Russian "troll factory."  The majority of these tweets were posted from 2015-2017, but the datasets encompass tweets from February 2012 to May 2018.
+
+Three of the main categories of troll tweet that we will be focusing on are Left Trolls, Right Trolls, and News Feed.  **Left Trolls** usually pretend to be BLM activists, aiming to divide the democratic party (in this context, being pro-Bernie so that votes are taken away from Hillary).  **Right trolls** imitate Trump supporters, and **News Feed** handles are "local news aggregators," typically linking to legitimate news.
+
+For our upcoming analyses, some important variables are:
+
+  * **author** (handle sending the tweet)
+  * **content** (text of the tweet)
+  * **language** (language of the tweet)
+  * **publish_date** (date and time the tweet was sent)
+
+Variable documentation can be found on [Github](https://github.com/fivethirtyeight/russian-troll-tweets/) and a more detailed description of the dataset can be found in this [fivethirtyeight article](https://fivethirtyeight.com/features/why-were-sharing-3-million-russian-troll-tweets/).
+
+Because there are 12 datasets containing 2,973,371 tweets sent by 2,848 Twitter handles in total, we will be using three of these datasets (one from a Right troll, one from a Left troll, and one from a News Feed account).
+
+\
+\
+
+1. Read in Troll Tweets Dataset - this takes a while. You can cache it so you don't need to read it in again each time you knit. Be sure to remove the `eval=FALSE`!!!!
+
+```{r, cache=TRUE, eval=FALSE}
+troll_tweets <- read_csv("https://raw.githubusercontent.com/fivethirtyeight/russian-troll-tweets/master/IRAhandle_tweets_12.csv")
+```
+
+2. Basic Data Cleaning and Exploration
+
+  a. Remove rows where the tweet was in a language other than English
+  b. Report the dimensions of the dataset
+  c. Create two or three basic exploratory plots of the data (ex. plot of the different locations from which tweets were posted, plot of the account category of a tweet)
+  
+```{r}
+
+```
+
+3. Unnest Tokens
+
+We want each row to represent a word from a tweet, rather than an entire tweet. Be sure to remove the `eval=FALSE`!!!!
+
+```{r, eval = FALSE}
+troll_tweets_untoken <- troll_tweets1 %>%
+  unnest_tokens(???,???)
+
+troll_tweets_untoken
+```
+
+\
+\
+
+4. Remove stopwords. Be sure to remove the `eval=FALSE`!!!!
+
+```{r, eval = FALSE}
+#get rid of stopwords (the, and, etc.)
+troll_tweets_cleaned <- troll_tweets_untoken %>%
+  anti_join(stop_words)
+```
+
+Take a look at the troll_tweets_cleaned dataset.  Are there any other words/letters/numbers that we want to eliminate that weren't taken care of by stop_words? Be sure to remove the `eval=FALSE`!!!!
+
+```{r, eval = FALSE}
+#get rid of http, https, t.co, rt, amp, single number digits, and singular letters
+troll_tweets_cleaned <- troll_tweets_cleaned %>%
+  filter(word != ????) # you can use %in% for a list of words
+```
+
+
+5. Look at a subset of the tweets to see how often the top words appear.
+
+```{r, eval = FALSE}
+troll_tweets_small <- troll_tweets_cleaned %>%
+  count(??) %>%
+  slice_max(order_by = n, n = 50) # 50 most occurring words
+
+# visualize the number of times the 50 top words appear
+ggplot(troll_tweets_small, 
+       aes(y = fct_reorder(word,n), x = n)) +
+  geom_col()
+```
+
+
+6. Sentiment Analysis
+
+  a. Get the sentiments using the "bing" parameter (which classifies words into "positive" or "negative")
+  b. Report how many positive and negative words there are in the dataset.  Are there more positive or negative words, and why do you think this might be?
+  
+Be sure to remove the `eval=FALSE`!!!!
+
+```{r, eval = FALSE}
+# look at sentiment
+get_sentiments("bing")
+
+# assign a sentiment to each word that has one associated
+troll_tweets_sentiment <- troll_tweets_cleaned %>%
+  inner_join(???)
+
+# count the sentiments
+troll_tweets_sentiment %>% 
+  ???
+```
+
+7. Using the troll_tweets_small dataset, make a wordcloud:
+
+  a. That is sized by the number of times that a word appears in the tweets
+  b. That is colored by sentiment (positive or negative)
+
+
+Be sure to remove the `eval=FALSE`!!!!
+
+```{r, eval = FALSE}
+# make a wordcloud where the size of the word is based on the number of times the word appears across the tweets
+
+troll_tweets_small %>%
+  with(wordcloud(word, n, max.words = ??))
+
+# make a wordcloud colored by sentiment
+
+troll_tweets_sentiment %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(colors = c(??,??),
+                   max.words = ??)
+```
+
+Are there any words whose categorization as "positive" or "negative" surprised you?
+
+
+## Projects
+
+Read the project description on the moodle page. Talk to your group members about potential topics. 
+
+**Task:**
+
+Write a short paragraph about ideas you have. If you already have some data sources in mind, you can link to those, but I'm more concerned with you having a topic that you're interested in investigating right now. 
+
+## "Undoing" bias
+
+**Task:**
+
+Read this tweet [thread](https://threadreaderapp.com/thread/1375957284061376516.html) by [Deb Raji](https://en.wikipedia.org/wiki/Deborah_Raji) who you may remember from the *Coded Bias* film. Write a short paragraph that discusses at least one of the misconceptions.
