@@ -39,6 +39,7 @@ library(textdata)
 library(reshape2)
 library(wordcloud)         # for wordcloud
 library(stopwords)
+library(plotly)
 
 theme_set(theme_minimal()) # Lisa's favorite theme
 ```
@@ -199,6 +200,75 @@ plot(rf_shap3)
   
   - Construct a LIME graph (follow my code carefully). How close is each original prediction to the prediction from the local model? Interpret the result. You can also try using fewer or more variables in the local model than I used in the example.  
   
+```{r}
+set.seed(2)
+
+
+model_type.dalex_explainer <- DALEXtra::model_type.dalex_explainer
+predict_model.dalex_explainer <- DALEXtra::predict_model.dalex_explainer
+
+lime_rf1 <- predict_surrogate(explainer = rf_explain,
+                             new_observation = new_obs1 %>%
+                               select(-log_price), 
+                             n_features = 5,
+                             n_permutations = 1000,
+                             type = "lime")
+
+lime_rf1 %>% 
+  select(model_r2, model_prediction, prediction) %>% 
+  distinct()
+
+
+```
+
+
+```{r}
+lime_rf2 <- predict_surrogate(explainer = rf_explain,
+                             new_observation = new_obs2 %>%
+                               select(-log_price), 
+                             n_features = 5,
+                             n_permutations = 1000,
+                             type = "lime")
+
+lime_rf2 %>% 
+  select(model_r2, model_prediction, prediction) %>% 
+  distinct()
+
+```
+
+
+```{r}
+lime_rf3 <- predict_surrogate(explainer = rf_explain,
+                             new_observation = new_obs3 %>%
+                               select(-log_price), 
+                             n_features = 5,
+                             n_permutations = 1000,
+                             type = "lime")
+
+lime_rf3 %>% 
+  select(model_r2, model_prediction, prediction) %>% 
+  distinct()
+```
+
+
+```{r}
+plot(lime_rf1) +
+  labs(x = "Variable")
+```
+
+```{r}
+plot(lime_rf2) +
+  labs(x = "Variable")
+```
+
+
+```{r}
+plot(lime_rf3) +
+  labs(x = "Variable")
+```
+ 
+
+
 2. Describe how you would use the interpretable machine learning tools we've learned (both local and global) in future machine learning projects? How does each of them help you?
 
 ## SQL
@@ -239,13 +309,38 @@ airport_summary
   
 ```
 
+
+```{r}
+show_query(airport_summary)
+```
+
+
+
+```{r}
+airport_summary_collect <- collect(airport_summary)
+```
+
   - With the dataset you wrote out, create a graph that helps illustrate the "worst" airports in terms of late arrivals. You have some freedom in how you define worst and you may want to consider some of the other variables you computed. Do some theming to make your graph look glamorous (those of you who weren't in my intro data science class this year may want to watch Will Chase's [Glamour of Graphics](https://www.youtube.com/watch?v=h5cTacaWE6I) talk for inspiration). 
+  
+
+  
+```{r}
+airport_summary_collect2 <- airport_summary_collect %>% 
+  mutate(month = as.factor(month)) %>% 
+  filter(total_departures >= 20)
+```
+  
   
   
 ```{r}
-airport_summary %>% 
-  ggplot(aes(x= total_departures, y= prop_late_over20, color = name)) +
-  geom_point()
+plot <- ggplot(airport_summary_collect2, aes(x = prop_late_over20,
+             y = avg_dist, color = name, shape = month)) +
+  geom_point() +
+  scale_x_continuous(expand = c(0,0), 
+                     labels = scales::percent) +
+  theme(legend.position = "none")
+
+ggplotly(plot)
 ```
   
   - Although your graph was truly inspirational, you've been requested to "boil it down to a few numbers." Some people just don't appreciate all that effort you put in. And, you need to use the already summarized data that you already pulled in from SQL. Create a table with 6 or fewer rows and 3 or fewer columns that summarizes which airport is the "worst" in terms of late arrivals. Be careful with your calculations. You may consider using the `kable`, `kableExtra`, or `gt` packages to make your table look truly spectacular.
@@ -294,7 +389,7 @@ Because there are 12 datasets containing 2,973,371 tweets sent by 2,848 Twitter 
 
 1. Read in Troll Tweets Dataset - this takes a while. You can cache it so you don't need to read it in again each time you knit. Be sure to remove the `eval=FALSE`!!!!
 
-```{r, cache=TRUE, eval=FALSE}
+```{r, cache=TRUE}
 troll_tweets <- read_csv("https://raw.githubusercontent.com/fivethirtyeight/russian-troll-tweets/master/IRAhandle_tweets_12.csv")
 ```
 
@@ -305,16 +400,38 @@ troll_tweets <- read_csv("https://raw.githubusercontent.com/fivethirtyeight/russ
   c. Create two or three basic exploratory plots of the data (ex. plot of the different locations from which tweets were posted, plot of the account category of a tweet)
   
 ```{r}
-
+troll_tweets2 <- troll_tweets %>% 
+  filter(language == "English")
 ```
+
+```{r}
+troll_tweets2 %>% 
+  dim()
+```
+
+
+```{r}
+troll_tweets2 %>% 
+  ggplot(aes(x = account_type)) +
+  geom_bar()
+```
+
+```{r}
+troll_tweets2 %>% 
+  ggplot(aes(x = retweet)) +
+  geom_bar()
+```
+
+
+
 
 3. Unnest Tokens
 
 We want each row to represent a word from a tweet, rather than an entire tweet. Be sure to remove the `eval=FALSE`!!!!
 
-```{r, eval = FALSE}
-troll_tweets_untoken <- troll_tweets1 %>%
-  unnest_tokens(???,???)
+```{r}
+troll_tweets_untoken <- troll_tweets2 %>%
+  unnest_tokens(word,content)
 
 troll_tweets_untoken
 ```
@@ -324,7 +441,7 @@ troll_tweets_untoken
 
 4. Remove stopwords. Be sure to remove the `eval=FALSE`!!!!
 
-```{r, eval = FALSE}
+```{r}
 #get rid of stopwords (the, and, etc.)
 troll_tweets_cleaned <- troll_tweets_untoken %>%
   anti_join(stop_words)
@@ -332,18 +449,22 @@ troll_tweets_cleaned <- troll_tweets_untoken %>%
 
 Take a look at the troll_tweets_cleaned dataset.  Are there any other words/letters/numbers that we want to eliminate that weren't taken care of by stop_words? Be sure to remove the `eval=FALSE`!!!!
 
-```{r, eval = FALSE}
+```{r}
 #get rid of http, https, t.co, rt, amp, single number digits, and singular letters
 troll_tweets_cleaned <- troll_tweets_cleaned %>%
-  filter(word != ????) # you can use %in% for a list of words
+  filter(word != 'https') %>% 
+  filter(word != "t.co") %>% 
+  filter(word != "http") %>% 
+  filter(word != "trump") %>% 
+  filter(word != "trump's")
 ```
 
 
 5. Look at a subset of the tweets to see how often the top words appear.
 
-```{r, eval = FALSE}
+```{r}
 troll_tweets_small <- troll_tweets_cleaned %>%
-  count(??) %>%
+  count(word) %>%
   slice_max(order_by = n, n = 50) # 50 most occurring words
 
 # visualize the number of times the 50 top words appear
@@ -360,17 +481,18 @@ ggplot(troll_tweets_small,
   
 Be sure to remove the `eval=FALSE`!!!!
 
-```{r, eval = FALSE}
+```{r}
 # look at sentiment
-get_sentiments("bing")
+sentiments <- get_sentiments("bing")
 
 # assign a sentiment to each word that has one associated
 troll_tweets_sentiment <- troll_tweets_cleaned %>%
-  inner_join(???)
+  inner_join(sentiments)
 
 # count the sentiments
 troll_tweets_sentiment %>% 
-  ???
+  group_by(sentiment) %>% 
+  summarise(count = n())
 ```
 
 7. Using the troll_tweets_small dataset, make a wordcloud:
@@ -381,21 +503,24 @@ troll_tweets_sentiment %>%
 
 Be sure to remove the `eval=FALSE`!!!!
 
-```{r, eval = FALSE}
+```{r}
 # make a wordcloud where the size of the word is based on the number of times the word appears across the tweets
 
 troll_tweets_small %>%
-  with(wordcloud(word, n, max.words = ??))
+  with(wordcloud(word, n, max.words = 50))
 
 # make a wordcloud colored by sentiment
 
 troll_tweets_sentiment %>%
+  count(word, sentiment, sort = TRUE) %>%
   acast(word ~ sentiment, value.var = "n", fill = 0) %>%
-  comparison.cloud(colors = c(??,??),
-                   max.words = ??)
+  comparison.cloud(colors = c("red","green"),
+                   max.words = 50)
 ```
 
 Are there any words whose categorization as "positive" or "negative" surprised you?
+
+I am slightly surprised that protest is negative, but the rest make sense to me. It was categorizing trump as positive, but I removed it because I think it was associating it with the word trump and not the person.
 
 
 ## Projects
