@@ -58,9 +58,145 @@ You are going to use the King County house data and the same random forest model
 
 **Tasks:**
 
+```{r}
+data("house_prices")
+
+# Create log_price and drop price variable
+house_prices <- house_prices %>% 
+  mutate(log_price = log(price, base = 10)) %>% 
+  # make all integers numeric ... fixes prediction problem
+  mutate(across(where(is.integer), as.numeric)) %>% 
+  select(-price)
+```
+
+```{r}
+house_split <- initial_split(house_prices, 
+                             prop = .75)
+house_training <- training(house_split)
+house_testing <- testing(house_split)
+```
+
+
+
+```{r}
+ranger_recipe <- 
+  recipe(formula = log_price ~ ., 
+         data = house_training) %>% 
+  step_date(date, 
+            features = "month") %>% 
+  # Make these evaluative variables, not included in modeling
+  update_role(all_of(c("id",
+                       "date")),
+              new_role = "evaluative")
+
+#define model
+ranger_spec <- 
+  rand_forest(mtry = 6, 
+              min_n = 10, 
+              trees = 200) %>% 
+  set_mode("regression") %>% 
+  set_engine("ranger")
+
+#create workflow
+ranger_workflow <- 
+  workflow() %>% 
+  add_recipe(ranger_recipe) %>% 
+  add_model(ranger_spec) 
+
+#fit the model
+set.seed(712) # for reproducibility - random sampling in random forest choosing number of variables
+ranger_fit <- ranger_workflow %>% 
+  fit(house_training)
+```
+
+```{r}
+rf_explain <- 
+  explain_tidymodels(
+    model = ranger_fit,
+    data = house_training %>% select(-log_price), 
+    y = house_training %>%  pull(log_price),
+    label = "rf"
+  )
+```
+
+```{r}
+new_obs1 <- house_testing %>% slice(306) 
+new_obs2 <- house_testing %>% slice(5366) 
+new_obs3 <- house_testing %>% slice(10) 
+```
+
+
+
+
 1. Choose 3 new observations and do the following for each observation:  
   - Construct a break-down plot using the default ordering. Interpret the resulting graph. Which variables contribute most to each observation's prediction?  
+  
+```{r}
+pp_rf1 <- predict_parts(explainer = rf_explain,
+                       new_observation = new_obs1,
+                       type = "break_down")
+
+pp_rf2 <- predict_parts(explainer = rf_explain,
+                       new_observation = new_obs2,
+                       type = "break_down")
+pp_rf3 <- predict_parts(explainer = rf_explain,
+                       new_observation = new_obs3,
+                       type = "break_down")
+
+
+```
+
+
+```{r}
+plot(pp_rf1)
+```
+
+```{r}
+plot(pp_rf2)
+```
+
+```{r}
+plot(pp_rf3)
+```
+
+
+
+  
   - Construct a SHAP graph and interpret it. Does it tell a similar story to the break-down plot?  
+  
+```{r}
+rf_shap1 <-predict_parts(explainer = rf_explain,
+                        new_observation = new_obs1,
+                        type = "shap",
+                        B = 10 
+)
+rf_shap2 <-predict_parts(explainer = rf_explain,
+                        new_observation = new_obs2,
+                        type = "shap",
+                        B = 10 
+)
+rf_shap3 <-predict_parts(explainer = rf_explain,
+                        new_observation = new_obs3,
+                        type = "shap",
+                        B = 10 
+)
+```
+
+```{r}
+plot(rf_shap1)
+```
+
+
+```{r}
+plot(rf_shap2)
+```
+
+```{r}
+plot(rf_shap3)
+```
+
+
+  
   - Construct a LIME graph (follow my code carefully). How close is each original prediction to the prediction from the local model? Interpret the result. You can also try using fewer or more variables in the local model than I used in the example.  
   
 2. Describe how you would use the interpretable machine learning tools we've learned (both local and global) in future machine learning projects? How does each of them help you?
@@ -71,8 +207,47 @@ You will use the `airlines` data from the SQL database that I used in the exampl
 
 **Tasks**:
 
-1. Create a SQL chunk and an equivalent R code chunk that does the following: for each airport (with its name, not code), year, and month find the total number of departing flights, the distinct destinations to which they flew, the average length of the flight, the average distance of the flight, and the proportion of flights that arrived more than 20 minutes late. In the R code chunk, write this out to a dataset. (HINT: 1. start small! 2. you may want to do the R part first and use it to "cheat" into the SQL code).  
-  - With the dataset you wrote out, create a graph that helps illustrate the "worst" airports in terms of late arrivals. You have some freedom in how you define worst and you may want to consider some of the other variables you computed. Do some theming to make your graph look glamorous (those of you who weren't in my intro data science class this year may want to watch Will Chase's [Glamour of Graphics](https://www.youtube.com/watch?v=h5cTacaWE6I) talk for inspiration).  
+1. Create a SQL chunk and an equivalent R code chunk that does the following: for each airport (with its name, not code), and month find the total number of departing flights, the average distance of the flight, and the proportion of flights that arrived more than 20 minutes late. In the R code chunk, write this out to a dataset. (HINT: 1. start small! 2. you may want to do the R part first and use it to "cheat" into the SQL code).  
+
+
+```{r}
+con_air <- dbConnect(RMySQL::MySQL(), 
+                     dbname = "airlines", 
+                     host = "mdsr.cdc7tgkkqd0n.us-east-1.rds.amazonaws.com", 
+                     user = "mdsr_public", 
+                     password = "ImhsmflMDSwR")
+```
+
+
+```{r}
+dbListFields(con_air, "airports")
+```
+
+
+```{r}
+airport_summary <- tbl(con_air, "flights") %>% 
+  filter(year == 2017) %>% 
+  group_by(origin, month) %>%
+  summarise(total_departures = n(),
+            avg_dist = mean(distance),
+            prop_late_over20 = mean(arr_delay > 20)
+            ) %>% 
+  inner_join(tbl(con_air, "airports"),
+             by = c("origin" = "faa")) %>% 
+  select(name, month, total_departures, avg_dist, prop_late_over20)
+airport_summary
+  
+```
+
+  - With the dataset you wrote out, create a graph that helps illustrate the "worst" airports in terms of late arrivals. You have some freedom in how you define worst and you may want to consider some of the other variables you computed. Do some theming to make your graph look glamorous (those of you who weren't in my intro data science class this year may want to watch Will Chase's [Glamour of Graphics](https://www.youtube.com/watch?v=h5cTacaWE6I) talk for inspiration). 
+  
+  
+```{r}
+airport_summary %>% 
+  ggplot(aes(x= total_departures, y= prop_late_over20, color = name)) +
+  geom_point()
+```
+  
   - Although your graph was truly inspirational, you've been requested to "boil it down to a few numbers." Some people just don't appreciate all that effort you put in. And, you need to use the already summarized data that you already pulled in from SQL. Create a table with 6 or fewer rows and 3 or fewer columns that summarizes which airport is the "worst" in terms of late arrivals. Be careful with your calculations. You may consider using the `kable`, `kableExtra`, or `gt` packages to make your table look truly spectacular.
   
 2. Come up with your own interesting question that data in the airlines database can help you answer. Write a SQL query and equivalent R code chunk to extract the data you need and create an elegant graph to help answer the question. Be sure to write down the question so it is clear. 
