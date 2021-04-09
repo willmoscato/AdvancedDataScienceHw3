@@ -9,7 +9,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-#knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
 ```
 
 ```{r libraries, message=FALSE}
@@ -51,6 +51,8 @@ When you finish the assignment, remove the `#` from the options chunk at the top
 From now on, GitHub should be part of your routine when doing assignments. I recommend making it part of your process anytime you are working in R, but I'll make you show it's part of your process for assignments.
 
 **Task**: When you are finished with the assignment, post a link below to the GitHub repo for the assignment. If you want to post it to your personal website, that's ok (not required). Make sure the link goes to a spot in the repo where I can easily find this assignment. For example, if you have a website with a blog and post the assignment as a blog post, link to the post's folder in the repo. As an example, I've linked to my GitHub stacking material [here](https://github.com/llendway/ads_website/tree/master/_posts/2021-03-22-stacking).
+\
+[Github Repo](https://github.com/willmoscato/AdvancedDataScienceHw3)
 
 
 ## Local Interpretable Machine Learning
@@ -370,7 +372,9 @@ plot <- ggplot(airport_summary_collect2, aes(x = prop_late_over20,
              y = avg_dist, color = name, shape = month)) +
   geom_point() +
   scale_x_continuous(expand = c(0,0), 
-                     labels = scales::percent) +
+                     labels = scales::percent) + 
+  xlab("Proportion of Flights 20+ Minutes Late") +
+  ylab("Average Distance Travelled") +
   theme(legend.position = "none")
 
 ggplotly(plot)
@@ -383,7 +387,7 @@ ggplotly(plot)
 airport_summary_collect2 %>% 
   filter(name %in% c("Nantucket Mem", "Bangor Intl", "Chippewa County International Airport", "Southwest Oregon Regional Airport", "Redding Muni", "Key Field")) %>% 
   group_by(name) %>% 
-  summarise(worstprop = max(prop_late_over20), avg_dist = mean(avg_dist))
+  summarise(`Proportion of Flights 20+ Minutes Late (Worst Month)` = max(prop_late_over20), `Average Distance Travelled` = mean(avg_dist))
 ```
 
   
@@ -439,6 +443,8 @@ plot <- ggplot(cancelled_collect2, aes(x = prop_cancelled,
   geom_point() +
   scale_x_continuous(expand = c(0,0), 
                      labels = scales::percent) +
+   xlab("Proportion of Flights Cancelled") +
+  ylab("Average Distance Travelled") +
   theme(legend.position = "none")
 
 ggplotly(plot)
@@ -704,6 +710,8 @@ Read the project description on the moodle page. Talk to your group members abou
 
 Write a short paragraph about ideas you have. If you already have some data sources in mind, you can link to those, but I'm more concerned with you having a topic that you're interested in investigating right now. 
 
+**We have talked about doing something with causes of death from cdc data. I also had the idea of using real life soccer stats to predict the FIFA team of the season teams. I don't know how to scrape that data properly, but I think that could be very interesting. We also talked about using soccer stats to predict real life results.**
+
 ## "Undoing" bias
 
 **Task:**
@@ -711,4 +719,4 @@ Write a short paragraph about ideas you have. If you already have some data sour
 Read this tweet [thread](https://threadreaderapp.com/thread/1375957284061376516.html) by [Deb Raji](https://en.wikipedia.org/wiki/Deborah_Raji) who you may remember from the *Coded Bias* film. Write a short paragraph that discusses at least one of the misconceptions.
 
 \
-**j  **
+**The thing that I found most interesting about this thread was the idea that race and gender can be the least obvious biases to detect. These are the two biases that are talked about the most often when talking about justice and fairness, thus it seems odd that they would be hard to detect. It makes sense thinking about it though due to the fact that a lot of the demographic data that is collected is pretty bare and hard to get access to. This seems like an interesting and difficult conundrum. It seems hard that the things we need to have access to to make things more fair are protected classes (and protected with good intentions and for good reasons).**
