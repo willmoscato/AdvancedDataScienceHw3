@@ -151,15 +151,19 @@ pp_rf3 <- predict_parts(explainer = rf_explain,
 ```{r}
 plot(pp_rf1)
 ```
-
+\
+**The year the house was built, the size of the living space, and the location seem to be the most important for this observation. They are all positive for the prediction of price.**
 ```{r}
 plot(pp_rf2)
 ```
+\
+**For this observation it seems to be similar variables that are the most important, but only the location is positive.**
 
 ```{r}
 plot(pp_rf3)
 ```
-
+\
+**For this observation the same variables are the most important and they are all pretty stronly positive.**
 
 
   
@@ -195,7 +199,8 @@ plot(rf_shap2)
 ```{r}
 plot(rf_shap3)
 ```
-
+\
+**In all three of these shap plots the information that they are giving us is essentially the same as the break down profile, just with the added error bar.**
 
   
   - Construct a LIME graph (follow my code carefully). How close is each original prediction to the prediction from the local model? Interpret the result. You can also try using fewer or more variables in the local model than I used in the example.  
@@ -220,7 +225,8 @@ lime_rf1 %>%
 
 
 ```
-
+\
+**This prediction is fairly close.**
 
 ```{r}
 lime_rf2 <- predict_surrogate(explainer = rf_explain,
@@ -235,7 +241,8 @@ lime_rf2 %>%
   distinct()
 
 ```
-
+\
+**This prediction is also very close.**
 
 ```{r}
 lime_rf3 <- predict_surrogate(explainer = rf_explain,
@@ -250,26 +257,33 @@ lime_rf3 %>%
   distinct()
 ```
 
-
+\
+**This prediction is also fairly close, but it is the furthest of the three.**
 ```{r}
 plot(lime_rf1) +
   labs(x = "Variable")
 ```
-
+\
+**This is a little different from the first two, it has bathrooms as fairly important.**
 ```{r}
 plot(lime_rf2) +
   labs(x = "Variable")
 ```
-
+\
+**This has both latitude and longitude as being important and positive, thus confirming that the location is good.**
 
 ```{r}
 plot(lime_rf3) +
   labs(x = "Variable")
 ```
- 
+\
+ **This one is the most similar to the first two plots.**
 
 
 2. Describe how you would use the interpretable machine learning tools we've learned (both local and global) in future machine learning projects? How does each of them help you?
+
+\
+**Global interpretable machine learning tools are very helpful when you are trying to see larger trends and finding out which variables are the most important. They can also be very useful in finding out if you have a redundant variable. Local ones seem like they would be useful in comparing two specific predictions and seeing why one prediction was different from another.**
 
 ## SQL
 
@@ -293,6 +307,11 @@ con_air <- dbConnect(RMySQL::MySQL(),
 dbListFields(con_air, "airports")
 ```
 
+```{r}
+dbListFields(con_air, "carriers")
+```
+
+
 
 ```{r}
 airport_summary <- tbl(con_air, "flights") %>% 
@@ -308,6 +327,20 @@ airport_summary <- tbl(con_air, "flights") %>%
 airport_summary
   
 ```
+
+```{r}
+airports_query<- 
+tbl(con_air,sql("SELECT `origin`, `name`, `month`, `total_departures`, `avg_dist`, `prop_late_over20`
+FROM (SELECT `LHS`.`origin` AS `origin`, `LHS`.`month` AS `month`, `LHS`.`total_departures` AS `total_departures`, `LHS`.`avg_dist` AS `avg_dist`, `LHS`.`prop_late_over20` AS `prop_late_over20`, `RHS`.`name` AS `name`, `RHS`.`lat` AS `lat`, `RHS`.`lon` AS `lon`, `RHS`.`alt` AS `alt`, `RHS`.`tz` AS `tz`, `RHS`.`dst` AS `dst`, `RHS`.`city` AS `city`, `RHS`.`country` AS `country`
+FROM (SELECT `origin`, `month`, COUNT(*) AS `total_departures`, AVG(`distance`) AS `avg_dist`, AVG(`arr_delay` > 20.0) AS `prop_late_over20`
+FROM `flights`
+WHERE (`year` = 2017.0)
+GROUP BY `origin`, `month`) `LHS`
+INNER JOIN `airports` AS `RHS`
+ON (`LHS`.`origin` = `RHS`.`faa`)
+)`dbplyr_027`"))
+```
+
 
 
 ```{r}
@@ -345,7 +378,78 @@ ggplotly(plot)
   
   - Although your graph was truly inspirational, you've been requested to "boil it down to a few numbers." Some people just don't appreciate all that effort you put in. And, you need to use the already summarized data that you already pulled in from SQL. Create a table with 6 or fewer rows and 3 or fewer columns that summarizes which airport is the "worst" in terms of late arrivals. Be careful with your calculations. You may consider using the `kable`, `kableExtra`, or `gt` packages to make your table look truly spectacular.
   
+  
+```{r}
+airport_summary_collect2 %>% 
+  filter(name %in% c("Nantucket Mem", "Bangor Intl", "Chippewa County International Airport", "Southwest Oregon Regional Airport", "Redding Muni", "Key Field")) %>% 
+  group_by(name) %>% 
+  summarise(worstprop = max(prop_late_over20), avg_dist = mean(avg_dist))
+```
+
+  
 2. Come up with your own interesting question that data in the airlines database can help you answer. Write a SQL query and equivalent R code chunk to extract the data you need and create an elegant graph to help answer the question. Be sure to write down the question so it is clear. 
+
+**What carrier is worst? Worst determined by proportion of flights cancelled and average distance travelled (to account for the fact that shorter flights should get cancelled less often).**
+
+```{r}
+cancelled <-  tbl(con_air, "flights") %>% 
+  filter(year == 2017) %>% 
+  group_by(carrier, month) %>%
+  summarise(avg_dist = mean(distance),
+            prop_cancelled = mean(cancelled == 1),
+            total_departures = n()) %>% 
+  inner_join(tbl(con_air, "carriers"),
+             by = c("carrier" = "carrier")) 
+cancelled
+```
+
+```{r}
+show_query(cancelled)
+```
+
+```{r}
+cancelled_query <- 
+  tbl(con_air,
+      sql("SELECT `LHS`.`carrier` AS `carrier`, `LHS`.`month` AS `month`, `LHS`.`avg_dist` AS `avg_dist`, `LHS`.`prop_cancelled` AS `prop_cancelled`, `LHS`.`total_departures` AS `total_departures`, `RHS`.`name` AS `name`
+FROM (SELECT `carrier`, `month`, AVG(`distance`) AS `avg_dist`, AVG(`cancelled` = 1.0) AS `prop_cancelled`, COUNT(*) AS `total_departures`
+FROM `flights`
+WHERE (`year` = 2017.0)
+GROUP BY `carrier`, `month`) `LHS`
+INNER JOIN `carriers` AS `RHS`
+ON (`LHS`.`carrier` = `RHS`.`carrier`)"
+))
+
+```
+
+
+```{r}
+cancelled_collect <- collect(cancelled)
+```
+
+```{r}
+cancelled_collect2 <- cancelled_collect %>% 
+  mutate(month = as.factor(month))
+```
+
+
+
+```{r}
+plot <- ggplot(cancelled_collect2, aes(x = prop_cancelled,
+             y = avg_dist, color = name, shape = month)) +
+  geom_point() +
+  scale_x_continuous(expand = c(0,0), 
+                     labels = scales::percent) +
+  theme(legend.position = "none")
+
+ggplotly(plot)
+```
+
+**It seems that Spirit, Express, and Jet Blue are the worst airlines.**
+
+```{r}
+dbDisconnect(con_air)
+```
+
 
 
 ## Function Friday
@@ -360,6 +464,75 @@ Using the example from class that we presented as a baseline (or your own if you
 2.	Add a dot (or any symbol you want) to the centroid of each state.
 3.	Add a layer onto the map with the counties.
 4.	Change the coordinates of the map to zoom in on your favorite state.
+
+
+```{r}
+states <- st_as_sf(maps::map("state", 
+plot = FALSE, 
+fill = TRUE))
+head(states)
+
+
+ggplot(data = states) +
+    geom_sf(fill = NA) +
+    coord_sf(xlim = c(-127, -63), ylim = c(24, 51), expand = FALSE)
+
+
+states <- states %>%
+  mutate(area = as.numeric(st_area(states)))
+
+ggplot(data = states) +
+    geom_sf(aes(fill = area)) +
+    coord_sf(xlim = c(-127, -63), 
+ylim = c(24, 51), 
+expand = FALSE)
+```
+
+
+```{r}
+ggplot(data = states) +
+    geom_sf(aes(fill = area)) +
+    coord_sf(xlim = c(-127, -63), 
+ylim = c(24, 51), 
+expand = FALSE) +
+scale_fill_viridis_b()
+```
+
+```{r}
+ggplot(data = states) +
+    geom_sf(aes(fill = area)) +
+  stat_sf_coordinates() +
+    coord_sf(xlim = c(-127, -63), 
+ylim = c(24, 51), 
+expand = FALSE)
+```
+
+
+```{r}
+
+counties <- st_as_sf(map("county", plot = FALSE, fill = TRUE))
+counties$area <- as.numeric(st_area(counties))
+
+ggplot(data = states) +
+    geom_sf(data = counties, aes(fill = area)) +
+    coord_sf(xlim = c(-127, -63), 
+ylim = c(24, 51), 
+expand = FALSE) +
+scale_fill_viridis_b()
+```
+
+```{r}
+ggplot(data = states) +
+    geom_sf(data = counties, aes(fill = area)) +
+    coord_sf(xlim = c(-124.21, -113.19), 
+ylim = c(32.53, 41.998), 
+expand = FALSE) +
+scale_fill_viridis_b()
+```
+
+
+
+
 
 Hint: https://www.r-spatial.org/r/2018/10/25/ggplot2-sf-2.html is a useful reference for some of the questions
 
@@ -519,8 +692,8 @@ troll_tweets_sentiment %>%
 ```
 
 Are there any words whose categorization as "positive" or "negative" surprised you?
-
-I am slightly surprised that protest is negative, but the rest make sense to me. It was categorizing trump as positive, but I removed it because I think it was associating it with the word trump and not the person.
+\
+**I am slightly surprised that protest is negative, but the rest make sense to me. It was categorizing trump as positive, but I removed it because I think it was associating it with the word trump and not the person.**
 
 
 ## Projects
@@ -536,3 +709,6 @@ Write a short paragraph about ideas you have. If you already have some data sour
 **Task:**
 
 Read this tweet [thread](https://threadreaderapp.com/thread/1375957284061376516.html) by [Deb Raji](https://en.wikipedia.org/wiki/Deborah_Raji) who you may remember from the *Coded Bias* film. Write a short paragraph that discusses at least one of the misconceptions.
+
+\
+**j  **
